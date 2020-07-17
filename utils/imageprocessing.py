@@ -27,8 +27,10 @@ import os
 import math
 import random
 import numpy as np
-from scipy import misc
-
+#from scipy import misc
+# https://stackoverflow.com/a/48121996
+from skimage.transform import resize
+import imageio
 
 # Calulate the shape for creating new array given (h,w)
 def get_new_shape(images, size=None, n=None):
@@ -95,7 +97,7 @@ def resize(images, size):
     images_new = np.ndarray(shape_new, dtype=images.dtype)
 
     for i in range(n):
-        images_new[i] = misc.imresize(images[i], (h,w))
+        images_new[i] = resize(images[i], (h,w))
 
     return images_new
 
@@ -152,8 +154,8 @@ def random_downsample(images, min_ratio):
     for i in range(n):
         w = int(round(ratios[i] * _w))
         h = int(round(ratios[i] * _h))
-        images_new[i,:h,:w] = misc.imresize(images[i], (h,w))
-        images_new[i] = misc.imresize(images_new[i,:h,:w], (_h,_w))
+        images_new[i,:h,:w] = resize(images[i], (h,w))
+        images_new[i] = resize(images_new[i,:h,:w], (_h,_w))
         
     return images_new
 
@@ -227,7 +229,7 @@ def preprocess(images, config, is_training=False):
         assert (config.channels==1 or config.channels==3)
         mode = 'RGB' if config.channels==3 else 'I'
         for image_path in image_paths:
-            images.append(misc.imread(image_path, mode=mode))
+            images.append(imageio.imread(image_path))
         images = np.stack(images, axis=0)
     else:
         assert type(images) == np.ndarray

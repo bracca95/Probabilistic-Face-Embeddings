@@ -30,9 +30,11 @@ import time
 import math
 import numpy as np
 
+sys.path.append('/content/Probabilistic-Face-Embeddings')
 from utils import utils
 from utils.imageprocessing import preprocess
 from utils.dataset import Dataset
+
 from network import Network
 from evaluation.lfw import LFWTest
 

@@ -1,5 +1,7 @@
 """Align face images given landmarks."""
 
+# https://stackoverflow.com/a/47865626
+
 # MIT License
 # 
 # Copyright (c) 2019 Yichun Shi
@@ -26,11 +28,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from align.matlab_cp2tform import get_similarity_transform_for_cv2
+import sys
+sys.path.append('/content/Probabilistic-Face-Embeddings')
+
+from matlab_cp2tform import get_similarity_transform_for_cv2
 
 import numpy as np
-from scipy import misc
-import sys
+import imageio
 import os
 import argparse
 import random
@@ -80,7 +84,9 @@ def main(args):
         # Transform
         if args.prefix:
             img_path = os.path.join(args.prefix, img_path)
-        img = misc.imread(img_path)
+
+        # img = misc.imread(img_path)
+        img = imageio.imread(img_path)
         img_new, new_pts, tfm = align(img, src_pts, ref_pts, args.image_size, args.scale, args.transpose_input)
 
         # Visulize
@@ -99,7 +105,8 @@ def main(args):
             if not os.path.isdir(dir_path):
                 os.makedirs(dir_path)
             img_path_new = os.path.join(dir_path, file_name)
-            misc.imsave(img_path_new, img_new)
+            # misc.imsave(img_path_new, img_new)
+            imageio.imwrite(img_path_new, img_new)
             if i % 100==0:
                 print(img_path_new)
 
