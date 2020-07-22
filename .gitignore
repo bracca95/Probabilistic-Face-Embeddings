@@ -1,5 +1,6 @@
 # macos stuff
 .DS_Store
+load_data.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

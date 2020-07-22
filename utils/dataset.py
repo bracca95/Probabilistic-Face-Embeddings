@@ -42,6 +42,7 @@ class Dataset(object):
         if path is not None:
             self.init_from_path(path)
         else:
+            # empty dataset
             self.data = pd.DataFrame([], columns=['path', 'abspath', 'label', 'name'])
 
         self.prefix = prefix
@@ -81,10 +82,27 @@ class Dataset(object):
         return self.data.iloc
 
     def init_from_path(self, path):
+        """ method
+
+        if the passed string is a folder, go to function init_from_folder
+        if the passed string is a .txt file, go to init_from_list
+        """
         path = os.path.expanduser(path)
         _, ext = os.path.splitext(path)
+        
+        # if path is a folder
         if os.path.isdir(path):
-            self.init_from_folder(path)
+            #check if there are subfolders or only files (images)
+            for _, dirs, _ in os.walk(path):
+                pass
+            
+            # if only files
+            if not dirs:
+                self.init_from_images(path)
+            # if there are subfolders
+            else:
+                self.init_from_folder(path)
+        
         elif ext == '.txt':
             self.init_from_list(path)
         else:
@@ -92,22 +110,80 @@ class Dataset(object):
                 It should be either a folder, .txt or .hdf5 file' % path)
         # print('%d images of %d classes loaded' % (len(self.images), self.num_classes))
 
-    def init_from_folder(self, folder):
+
+    def init_from_images(self, folder):
+        """idea: use your method in PFSR to get a dataframe with paths, abspath,
+        labels (identity) and names (as 'celebName_label')
+        """
         folder = os.path.abspath(os.path.expanduser(folder))
-        class_names = os.listdir(folder)
-        class_names.sort()
+        csv_partition = 'list_eval_partition.csv'
+        csv_identity = 'identity_CelebA.csv'
+
+        csv_partition_path = os.path.join(os.path.dirname(folder), csv_partition)
+        csv_identity_path = os.path.join(os.path.dirname(folder), csv_identity)
+
+        df_partition = pd.read_csv(csv_partition_path)
+        df_identity = pd.read_csv(csv_identity_path)
+
+        df = df_partition.copy()
+
+        # this can be done because indexing is the same 
+        # https://stackoverflow.com/a/45747631
+        # now we have a dataset with ['image_id']['partition']['identity']
+        df['identity'] = df_identity['identity']
+        
+        # format dataframe as the program requires
+        # https://stackoverflow.com/a/20027386
+        # https://stackoverflow.com/a/53816799
+        df_full = pd.DataFrame({
+            'path': df['image_id'],
+            'abspath': folder + '/' + df['image_id'].astype(str),
+            'label': df['identity'],
+            'name': df['identity']
+            })
+
+        ## GET ONLY TWO IMAGES FOR IDENTITY
+        df_min = df.groupby(['identity']).min()
+        df_min.reset_index(inplace=True)
+        df_min = df_min[['image_id', 'partition', 'identity']]
+
+        df_max = df.groupby(['identity']).max()
+        df_max.reset_index(inplace=True)
+        df_max = df_max[['image_id', 'partition', 'identity']]
+
+        filt = (df['image_id'].isin(df_min['image_id']) == True) | \
+               (df['image_id'].isin(df_max['image_id']) == True)
+        df_compare = df.loc[filt]
+
+        # return values the program requires
+        self.data = df_compare
+        self.prefix = folder
+
+
+
+    def init_from_images(self, folder):
+        # if dataset main folder is provided 
+        folder = os.path.abspath(os.path.expanduser(folder))
+        class_names = os.listdir(folder)    # ls subfolders
+        class_names.sort()                  # sort subfolders by name
+        
         paths = []
         labels = []
         names = []
+        
         for label, class_name in enumerate(class_names):
-            classdir = os.path.join(folder, class_name)
+            classdir = os.path.join(folder, class_name)     # full subdir name
             if os.path.isdir(classdir):
+                # ls all images and get full name
                 images_class = os.listdir(classdir)
                 images_class.sort()
                 images_class = [os.path.join(class_name,img) for img in images_class]
+                
+                # fill the lists
                 paths.extend(images_class)
-                labels.extend(len(images_class) * [label])
+                labels.extend(len(images_class) * [label])  # assign label i to each image in asubdir
                 names.extend(len(images_class) * [class_name])
+        
         abspaths = [os.path.join(folder,p) for p in paths]
         self.data = pd.DataFrame({'path': paths, 'abspath': abspaths, 
                                             'label': labels, 'name': names})

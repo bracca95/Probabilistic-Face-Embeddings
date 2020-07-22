@@ -1,8 +1,6 @@
 """Main training file for PFE
 """
 
-# alterative https://github.com/TropComplique/Probabilistic-Face-Embeddings
-
 # MIT License
 # 
 # Copyright (c) 2019 Yichun Shi

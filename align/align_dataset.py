@@ -1,137 +1,70 @@
-"""Align face images given landmarks."""
+# https://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/
+#py_objdetect/py_face_detection/py_face_detection.html
 
-# https://stackoverflow.com/a/47865626
-
-# MIT License
-# 
-# Copyright (c) 2019 Yichun Shi
-# 
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-# 
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-# 
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-import sys
-sys.path.append('/content/Probabilistic-Face-Embeddings')
-
-from matlab_cp2tform import get_similarity_transform_for_cv2
-
-import numpy as np
-import imageio
-import os
 import argparse
-import random
 import cv2
+import os
+import numpy as np
 import matplotlib.pyplot as plt
+from os.path import join
+from tqdm import tqdm
 
-def align(src_img, src_pts, ref_pts, image_size, scale=1.0, transpose_input=False):
-    w, h = image_size = tuple(image_size)
+parser = argparse.ArgumentParser('align celeba face')
+parser.add_argument('--input_dir', type=str, help='dir original dataset')
+parser.add_argument('--output_dir', type=str, help='dir aligned images (out)')
+parser.add_argument('--shape', type=int, default=128, help='final shape (square)')
+args = parser.parse_args()
 
-    # Actual offset = new center - old center (scaled)
-    scale_ = max(w,h) * scale
-    cx_ref = cy_ref = 0.
-    offset_x = 0.5 * w - cx_ref * scale_
-    offset_y = 0.5 * h - cy_ref * scale_
+if __name__=='__main__':
+    
+    ## LOAD CASCADES (FRONTAL + PROFILE)
+    path_to_cascade = '/usr/local/lib/python3.6/dist-packages/cv2/data'
+    cascade_frontal = 'haarcascade_frontalface_default.xml'
+    cascade_profile = 'haarcascade_profileface.xml'
 
-    s = np.array(src_pts).astype(np.float32).reshape([-1,2])
-    r = np.array(ref_pts).astype(np.float32) * scale_ + np.array([[offset_x, offset_y]])
-    if transpose_input: 
-        s = s.reshape([2,-1]).T
+    path_cascade_frontal = join(path_to_cascade, cascade_frontal)
+    path_cascade_profile = join(path_to_cascade, cascade_profile)
 
-    tfm = get_similarity_transform_for_cv2(s, r)
-    dst_img = cv2.warpAffine(src_img, tfm, image_size)
+    face_cascade_front = cv2.CascadeClassifier(path_cascade_frontal)
+    face_cascade_profi = cv2.CascadeClassifier(path_cascade_profile)
 
-    s_new = np.concatenate([s.reshape([2,-1]), np.ones((1, s.shape[0]))])
-    s_new = np.matmul(tfm, s_new)
-    s_new = s_new.reshape([-1]) if transpose_input else s_new.T.reshape([-1]) 
-    tfm = tfm.reshape([-1])
-    return dst_img, s_new, tfm
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
 
+    ## READ IMAGES
+    for i, elem in tqdm(enumerate(os.listdir(args.input_dir))):
+        img_name = elem
 
-def main(args):
-    with open(args.input_file, 'r') as f:
-        lines = f.readlines()
+        img_path_og = join(args.input_dir, img_name)
+        img = cv2.imread(img_path_og, cv2.IMREAD_COLOR)
 
-    ref_pts = np.array( [[ -1.58083929e-01, -3.84258929e-02],
-                         [  1.56533929e-01, -4.01660714e-02],
-                         [  2.25000000e-04,  1.40505357e-01],
-                         [ -1.29024107e-01,  3.24691964e-01],
-                         [  1.31516964e-01,  3.23250893e-01]])
+        img_colo = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    for i,line in enumerate(lines):
-        line = line.strip()
-        items = line.split()
-        img_path = items[0]
-        src_pts = [float(item) for item in items[1:]]
+        # use frontal is found, profile otherwise
+        if face_cascade_front.detectMultiScale(img_gray, 1.3, 5) is not None:
+            method = face_cascade_front.detectMultiScale(img_gray, 1.3, 5)
+        else:
+            method = face_cascade_profi.detectMultiScale(img_gray, 1.3, 5)
 
-        # Transform
-        if args.prefix:
-            img_path = os.path.join(args.prefix, img_path)
+        for (x,y,w,h) in method:
+            """ detect face
 
-        # img = misc.imread(img_path)
-        img = imageio.imread(img_path)
-        img_new, new_pts, tfm = align(img, src_pts, ref_pts, args.image_size, args.scale, args.transpose_input)
+            force to be a square (in order to crop at 128x1218)
+            chooose the bigger (h/w)"""
+            
+            l = h if h >= w else w
+            img = img_colo[y:y+l, x:x+l]
 
-        # Visulize
-        if args.visualize:
-            plt.imshow(img_new)
-            plt.show()
-               
-
-        # Output
-        if args.output_dir:
-            file_name = os.path.basename(img_path)
-            sub_dir = [d for d in img_path.split('/') if d!='']
-            sub_dir = '/'.join(sub_dir[-args.dir_depth:-1])
-            dir_path = os.path.join(args.output_dir, sub_dir)
-                
-            if not os.path.isdir(dir_path):
-                os.makedirs(dir_path)
-            img_path_new = os.path.join(dir_path, file_name)
-            # misc.imsave(img_path_new, img_new)
-            imageio.imwrite(img_path_new, img_new)
-            if i % 100==0:
-                print(img_path_new)
+            # resize
+            shape = (128, 128)
+            img_resz = cv2.resize(img, shape)
 
 
-    return
+        ## OUTPUT
+        img_out_path = join(args.output_dir, img_name)
+        cv2.imwrite(img_out_path, img_resz)
 
-
-        
-
-def parse_arguments(argv):
-    parser = argparse.ArgumentParser()
-    parser.add_argument('input_file', type=str, help='A list file of image paths and landmarks.')
-    parser.add_argument('output_dir', type=str, help='Directory with aligned face thumbnails.', default=None)
-    parser.add_argument('--prefix', type=str, help='The prefix of the image files in the input_file.', default=None)
-    parser.add_argument('--image_size', type=int, nargs=2,
-        help='Image size (height, width) in pixels.', default=[112, 112])
-    parser.add_argument('--scale', type=float,
-        help='Scale the face size in the target image.', default=1.0)
-    parser.add_argument('--dir_depth', type=int,
-        help='When writing into new directory, how many layers of the dir tree should be kept.', default=2)
-    parser.add_argument('--transpose_input', action='store_true',
-        help='Set true if the input landmarks is in the format x1 x2 ... y1 y2 ...')
-    parser.add_argument('--visualize', action='store_true',
-        help='Visualize the aligned images.')
-    return parser.parse_args(argv)
-
-if __name__ == '__main__':
-    main(parse_arguments(sys.argv[1:]))
+        # # debug
+        # if i%100==0:
+        #     print(img_out_path)

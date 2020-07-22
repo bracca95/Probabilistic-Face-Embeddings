@@ -31,9 +31,13 @@ preprocess_train = [
     ['standardize', 'mean_scale'],
 ]
 
-# Preprocess for testing
+# # Preprocess for testing
+# preprocess_test = [
+#     ['center_crop', (112, 96)],
+#     ['standardize', 'mean_scale'],
+# ]
+
 preprocess_test = [
-    ['center_crop', (112, 96)],
     ['standardize', 'mean_scale'],
 ]
 

@@ -36,13 +36,13 @@ from utils.imageprocessing import preprocess
 from utils.dataset import Dataset
 
 from network import Network
-from evaluation.lfw import LFWTest
+from evaluation.celeba import CelebATest
 
 
 def main(args):
 
-
-    paths = Dataset(args.dataset_path)['abspath']
+    fullDF = Dataset(args.dataset_path)      # pd.DataFrame object
+    paths = fullDF['abspath']                # pd.DataFrame object (still)
     print('%d images to load.' % len(paths))
     assert(len(paths)>0)
 
@@ -50,17 +50,19 @@ def main(args):
     network = Network()
     network.load_model(args.model_dir)
     images = preprocess(paths, network.config, False)
+    """ preprocess: imageprocessing.py, line 239
+        network.config: network.py, line 165 -> loads config/sphere64_casia.py 'preprocess_test' only"""
 
     # Run forward pass to calculate embeddings
     mu, sigma_sq = network.extract_feature(images, args.batch_size, verbose=True)
     feat_pfe = np.concatenate([mu, sigma_sq], axis=1)
     
-    lfwtest = LFWTest(paths)
-    lfwtest.init_standard_proto(args.protocol_path)
+    celebatest = CelebATest(paths)
+    celebatest.init_standard_proto(fullDF)
 
-    accuracy, threshold = lfwtest.test_standard_proto(mu, utils.pair_euc_score)
+    accuracy, threshold = celebatest.test_standard_proto(mu, utils.pair_euc_score)
     print('Euclidean (cosine) accuracy: %.5f threshold: %.5f' % (accuracy, threshold))
-    accuracy, threshold = lfwtest.test_standard_proto(feat_pfe, utils.pair_MLS_score)
+    accuracy, threshold = celebatest.test_standard_proto(feat_pfe, utils.pair_MLS_score)
     print('MLS accuracy: %.5f threshold: %.5f' % (accuracy, threshold))
 
 
