@@ -32,34 +32,43 @@ StandardFold = namedtuple('StandardFold', ['indices1', 'indices2', 'labels'])
 
 class LFWTest:
     def __init__(self, image_paths):
+        # path to all single jpeg images
         self.image_paths = np.array(image_paths).astype(np.object).flatten()
         self.images = None
         self.labels = None
         self.standard_folds = None
         self.blufr_folds = None
         self.queue_idx = None
+        self.n_fold = 10
 
     def init_standard_proto(self, lfw_pairs_file):
+        # retrieve image name and extension
         index_dict = {}
         for i, image_path in enumerate(self.image_paths):
             image_name, image_ext = os.path.splitext(os.path.basename(image_path))
-            index_dict[image_name] = i
+            index_dict[image_name] = i  # dict
+            """ this dict is pretty complex: it creates an entry for every
+            image name and assigns a unique label
+            e.g. {'mario': 1, 'ale': 2, 'kjaer': 3, ...}
+            if the subfolder name_surname contains multiple images (key), 
+            they'll be assigned a different number (value)"""
 
         pairs = []
         with open(lfw_pairs_file, 'r') as f:
             for line in f.readlines()[1:]:
                 pair = line.strip().split()
-                pairs.append(pair)
+                pairs.append(pair)  # list of lists
 
-        # 10 folds
+        # 10 folds: 300+ & 300- (600) sequentially for 10 times -> 6000
         self.standard_folds = []
-        for i in range(10):
+        for i in range(self.n_fold):
             indices1 = np.zeros(600, dtype=np.int32)
             indices2 = np.zeros(600, dtype=np.int32)
             labels = np.array([True]*300+[False]*300, dtype=np.bool)
             # 300 positive pairs, 300 negative pairs in order
             for j in range(600):
                 pair = pairs[600*i+j]
+                # e.g. out ['Slobodan_Milosevic', '2', 'Sok_An', '1']
                 if j < 300:
                     assert len(pair) == 3
                     img1 = pair[0] + '_' + '%04d' % int(pair[1])
@@ -67,27 +76,35 @@ class LFWTest:
                 else:
                     assert len(pair) == 4
                     img1 = pair[0] + '_' + '%04d' % int(pair[1])
-                    img2 = pair[2] + '_' + '%04d' % int(pair[3])                
-                indices1[j] = index_dict[img1]
+                    img2 = pair[2] + '_' + '%04d' % int(pair[3])
+                    # e.g. out 'Slobodan_Milosevic-0001'                
+                indices1[j] = index_dict[img1]      # e.g. 1 = di2['mario'], line 52
                 indices2[j] = index_dict[img2]
             fold = StandardFold(indices1, indices2, labels)
             self.standard_folds.append(fold)
+            """devo fare in modo di ottenere i due indici (numeri delle immagini
+            senza estensioni e le loro labels"""
 
     def test_standard_proto(self, features, compare_func):
 
         assert self.standard_folds is not None
         
-        accuracies = np.zeros(10, dtype=np.float32)
-        thresholds = np.zeros(10, dtype=np.float32)
+        accuracies = np.zeros(self.n_fold, dtype=np.float32)
+        thresholds = np.zeros(self.n_fold, dtype=np.float32)
 
         features1 = []
         features2 = []
 
-        for i in range(10):
+        for i in range(self.n_fold):
             # Training
-            train_indices1 = np.concatenate([self.standard_folds[j].indices1 for j in range(10) if j!=i])
-            train_indices2 = np.concatenate([self.standard_folds[j].indices2 for j in range(10) if j!=i])
-            train_labels = np.concatenate([self.standard_folds[j].labels for j in range(10) if j!=i])
+            train_indices1 = np.concatenate(\
+                [self.standard_folds[j].indices1 for j in range(self.n_fold) if j!=i])
+            train_indices2 = np.concatenate(\
+                [self.standard_folds[j].indices2 for j in range(self.n_fold) if j!=i])
+            train_labels = np.concatenate(\
+                [self.standard_folds[j].labels for j in range(self.n_fold) if j!=i])
+
+            print(len(train_indices1), train_indices1)
 
             train_features1 = features[train_indices1,:]
             train_features2 = features[train_indices2,:]

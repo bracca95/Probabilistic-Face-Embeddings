@@ -40,72 +40,85 @@ class CelebATest:
         self.standard_folds = None
         self.blufr_folds = None
         self.queue_idx = None
+        self.n_fold = 10
 
     def init_standard_proto(self, lfw_pairs_file):
 
         self.standard_folds = []
         df = lfw_pairs_file
-        rang = 3000
+        rang = 600
+        rang_half = int(rang/2)
 
-        for it, iden in enumerate(range(rang)):
-            filt = (df['identity'] == iden)
-            
-            # filter two different DFs
-            df_pair = df.loc[filt]
-            df_impo = df.loc[~filt]
-            # https://www.geeksforgeeks.org/how-to-randomly-select-rows-from-pandas-dataframe/
-            df_impostor_line = df_impo.sample()
-
-            # two images with same ID, the third image is another person
-            df_triple = df_pair.append(df_impostor_line)
+        for i in range(self.n_fold):
 
             # init lists
             indices1 = np.zeros(rang, dtype=np.int32)
             indices2 = np.zeros(rang, dtype=np.int32)
-            lab_list = np.array(([True]+[False])*rang, dtype=np.bool)
+            labels = np.array([True]*rang_half+[False]*rang_half, dtype=np.bool)
 
-            # get face numbers (image id)
-            face1 = df_triple['image_id'].iloc[0]   # face 1
-            face2 = df_triple['image_id'].iloc[1]   # face 2
-            face3 = df_triple['image_id'].iloc[2]   # impostor
-            
-            f1, _ = os.path.splitext(face1)          # get integer face 1
-            f2, _ = os.path.splitext(face2)          # get integer face 2
-            f3, _ = os.path.splitext(face3)          # get integer impostor
+            for iden in range(rang):
 
-            # position
-            pos = 2*it
-            
-            # fill positive examples
-            indices1[pos] = f1
-            indices2[pos] = f2
-            lab_list[pos] = True
+                # retrieve an image label
+                eq = (rang*i) + (iden+1)
+                filt = (df['label'] == eq)
 
-            # fill negative examples
-            indices1[pos+1] = f1
-            indices2[pos+1] = f3
-            lab_list[pos+1] = False
+                # if that label is not present (identity with only one image)
+                while df.loc[filt]['label'].count() == 0:
+                    eq += 1
+                    filt = (df['label'] == eq)
+                
+                # filter two different DFs
+                df_pair = df.loc[filt]
+                
+                # https://www.geeksforgeeks.org/how-to-randomly-select-rows-from-pandas-dataframe/
+                # two images with same ID, the third image is another person
+                df_impo = df.loc[~filt]
+                df_impostor_line = df_impo.sample()
+                df_triple = df_pair.append(df_impostor_line)
+
+                if iden < rang_half:
+                    # get face numbers (image id)
+                    face1 = df_triple['path'].iloc[0]   # face 1
+                    face2 = df_triple['path'].iloc[1]   # face 2
+                else:
+                    # get face 1 + impostor
+                    face1 = df_triple['path'].iloc[0]   # face 1
+                    face2 = df_triple['path'].iloc[2]   # impostor
+                
+                f1, _ = os.path.splitext(face1)          # get string face 1
+                f2, _ = os.path.splitext(face2)          # get string face 2
+
+                f1 = int(f1)
+                f2 = int(f2)
+                
+                # fill examples
+                indices1[iden] = f1
+                indices2[iden] = f2
 
             fold = StandardFold(indices1, indices2, labels)
             self.standard_folds.append(fold)
-            
 
 
     def test_standard_proto(self, features, compare_func):
 
         assert self.standard_folds is not None
         
-        accuracies = np.zeros(10, dtype=np.float32)
-        thresholds = np.zeros(10, dtype=np.float32)
+        accuracies = np.zeros(self.n_fold, dtype=np.float32)
+        thresholds = np.zeros(self.n_fold, dtype=np.float32)
 
         features1 = []
         features2 = []
 
-        for i in range(10):
+        for i in range(self.n_fold):
             # Training
-            train_indices1 = np.concatenate([self.standard_folds[j].indices1 for j in range(10) if j!=i])
-            train_indices2 = np.concatenate([self.standard_folds[j].indices2 for j in range(10) if j!=i])
-            train_labels = np.concatenate([self.standard_folds[j].labels for j in range(10) if j!=i])
+            train_indices1 = np.concatenate(\
+                [self.standard_folds[j].indices1 for j in range(self.n_fold) if j!=i])
+            train_indices2 = np.concatenate(\
+                [self.standard_folds[j].indices2 for j in range(self.n_fold) if j!=i])
+            train_labels = np.concatenate(\
+                [self.standard_folds[j].labels for j in range(self.n_fold) if j!=i])
+
+            print(len(train_indices1), train_indices1)
 
             train_features1 = features[train_indices1,:]
             train_features2 = features[train_indices2,:]

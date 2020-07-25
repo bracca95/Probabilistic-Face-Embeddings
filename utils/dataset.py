@@ -92,7 +92,7 @@ class Dataset(object):
         
         # if path is a folder
         if os.path.isdir(path):
-            #check if there are subfolders or only files (images)
+            # check if there are subfolders or only files (images)
             for _, dirs, _ in os.walk(path):
                 pass
             
@@ -112,9 +112,7 @@ class Dataset(object):
 
 
     def init_from_images(self, folder):
-        """idea: use your method in PFSR to get a dataframe with paths, abspath,
-        labels (identity) and names (as 'celebName_label')
-        """
+
         folder = os.path.abspath(os.path.expanduser(folder))
         csv_partition = 'list_eval_partition.csv'
         csv_identity = 'identity_CelebA.csv'
@@ -142,26 +140,41 @@ class Dataset(object):
             'name': df['identity']
             })
 
+        ## REMOVE IDENTITIES THAT ONLY OCCUR ONCE
+        df_group = df_full.groupby(['label']).count()
+        
+        filt1 = (df_group['path']==1)
+        df_excptn = df_group.loc[filt1]
+        df_excptn.reset_index(inplace=True)
+        df_excptn = df_excptn[['path', 'abspath', 'label', 'name']]
+
+        filt2 = (df_full['label'].isin(df_excptn['label']) == False)
+        df_full = df_full.loc[filt2]
+
         ## GET ONLY TWO IMAGES FOR IDENTITY
-        df_min = df.groupby(['identity']).min()
+        df_min = df_full.groupby(['label']).min()
         df_min.reset_index(inplace=True)
-        df_min = df_min[['image_id', 'partition', 'identity']]
+        df_min = df_min[['path', 'abspath', 'label', 'name']]
 
-        df_max = df.groupby(['identity']).max()
+        df_max = df_full.groupby(['label']).max()
         df_max.reset_index(inplace=True)
-        df_max = df_max[['image_id', 'partition', 'identity']]
+        df_max = df_max[['path', 'abspath', 'label', 'name']]
 
-        filt = (df['image_id'].isin(df_min['image_id']) == True) | \
-               (df['image_id'].isin(df_max['image_id']) == True)
-        df_compare = df.loc[filt]
+        filt = (df_full['path'].isin(df_min['path']) == True) | \
+               (df_full['path'].isin(df_max['path']) == True)
+        df_compare = df_full.loc[filt]
 
         # return values the program requires
         self.data = df_compare
         self.prefix = folder
 
 
+    def getDF(self):
+        return self.data
 
-    def init_from_images(self, folder):
+
+
+    def init_from_folder(self, folder):
         # if dataset main folder is provided 
         folder = os.path.abspath(os.path.expanduser(folder))
         class_names = os.listdir(folder)    # ls subfolders

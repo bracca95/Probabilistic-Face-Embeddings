@@ -198,7 +198,7 @@ class Network:
                     self.keep_prob: 1.0}
             mu[start_idx:end_idx], sigma_sq[start_idx:end_idx] = self.sess.run([self.mu, self.sigma_sq], feed_dict=feed_dict)
         if verbose:
-            print('')
+            print('TIPOMUTIPOMUTIPOMUTIPOMUTIPOMUTIPOMU\n', mu.shape)
         return mu, sigma_sq
 
 

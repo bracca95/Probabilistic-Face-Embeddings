@@ -31,8 +31,8 @@ import math
 import numpy as np
 
 sys.path.append('/content/Probabilistic-Face-Embeddings')
+from align import align_dataset
 from utils import utils
-from utils.imageprocessing import preprocess
 from utils.dataset import Dataset
 
 from network import Network
@@ -41,17 +41,16 @@ from evaluation.celeba import CelebATest
 
 def main(args):
 
-    fullDF = Dataset(args.dataset_path)      # pd.DataFrame object
-    paths = fullDF['abspath']                # pd.DataFrame object (still)
+    dataset = Dataset(args.dataset_path)      
+    fullDF = dataset.getDF()                  # pd.DataFrame object
+    paths = fullDF['abspath']                 # pd Series
     print('%d images to load.' % len(paths))
     assert(len(paths)>0)
 
     # Load model files and config file
     network = Network()
     network.load_model(args.model_dir)
-    images = preprocess(paths, network.config, False)
-    """ preprocess: imageprocessing.py, line 239
-        network.config: network.py, line 165 -> loads config/sphere64_casia.py 'preprocess_test' only"""
+    images = align_dataset.pre_processing(args)
 
     # Run forward pass to calculate embeddings
     mu, sigma_sq = network.extract_feature(images, args.batch_size, verbose=True)
@@ -72,6 +71,8 @@ if __name__ == '__main__':
                         type=str)
     parser.add_argument("--dataset_path", help="The path to the LFW dataset directory",
                         type=str, default='data/lfw_mtcnncaffe_aligned')
+    parser.add_argument('--shape', help='final shape (square)',
+                        type=int, default=128)
     parser.add_argument("--protocol_path", help="The path to the LFW protocol file",
                         type=str, default='./proto/lfw_pairs.txt')
     parser.add_argument("--batch_size", help="Number of images per mini batch",
