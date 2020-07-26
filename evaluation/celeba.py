@@ -45,7 +45,16 @@ class CelebATest:
     def init_standard_proto(self, lfw_pairs_file):
 
         self.standard_folds = []
+
+        index_dict = {}
+        for i, image_path in enumerate(self.image_paths):
+            image_name, image_ext = os.path.splitext(os.path.basename(image_path))
+            index_dict[image_name] = i
+
+        # retrieve all the IDs (unique)
         df = lfw_pairs_file
+        id_list = list(df['label'].unique())
+        
         rang = 600
         rang_half = int(rang/2)
 
@@ -59,13 +68,9 @@ class CelebATest:
             for iden in range(rang):
 
                 # retrieve an image label
-                eq = (rang*i) + (iden+1)
-                filt = (df['label'] == eq)
-
-                # if that label is not present (identity with only one image)
-                while df.loc[filt]['label'].count() == 0:
-                    eq += 1
-                    filt = (df['label'] == eq)
+                tot_iter = (rang*i) + (iden)        # overall iteration
+                curr_id = id_list[tot_iter]         # ID at iteration tot_iter
+                filt = (df['label'] == curr_id)     # filter for that ID
                 
                 # filter two different DFs
                 df_pair = df.loc[filt]
@@ -88,12 +93,15 @@ class CelebATest:
                 f1, _ = os.path.splitext(face1)          # get string face 1
                 f2, _ = os.path.splitext(face2)          # get string face 2
 
-                f1 = int(f1)
-                f2 = int(f2)
+                # f1 = int(f1)
+                # f2 = int(f2)
                 
-                # fill examples
-                indices1[iden] = f1
-                indices2[iden] = f2
+                # # fill examples
+                # indices1[iden] = f1
+                # indices2[iden] = f2
+
+                indices1[iden] = index_dict[f1]
+                indices2[iden] = index_dict[f2]
 
             fold = StandardFold(indices1, indices2, labels)
             self.standard_folds.append(fold)

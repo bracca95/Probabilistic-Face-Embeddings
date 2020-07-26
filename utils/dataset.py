@@ -23,6 +23,7 @@
 # SOFTWARE.
 
 import sys
+import random
 import os
 import time
 import math
@@ -163,6 +164,14 @@ class Dataset(object):
         filt = (df_full['path'].isin(df_min['path']) == True) | \
                (df_full['path'].isin(df_max['path']) == True)
         df_compare = df_full.loc[filt]
+
+        ## SELECT 6000 IDENTITIES
+        # https://stackoverflow.com/a/9755548
+        id_list = df_compare['label'].unique()  # retrieve all the identities
+        id_list_select = random.sample(list(id_list), 6000) # select 6000 (list)
+
+        ff = df_compare['label'].isin(id_list_select)
+        df_compare = df_compare.loc[ff]
 
         # return values the program requires
         self.data = df_compare

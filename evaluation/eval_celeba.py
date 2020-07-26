@@ -34,6 +34,7 @@ sys.path.append('/content/Probabilistic-Face-Embeddings')
 from align import align_dataset
 from utils import utils
 from utils.dataset import Dataset
+from utils.imageprocessing import preprocess
 
 from network import Network
 from evaluation.celeba import CelebATest
@@ -47,10 +48,14 @@ def main(args):
     print('%d images to load.' % len(paths))
     assert(len(paths)>0)
 
+    # save images and return updated DF
+    fullDF = align_dataset.processing(fullDF, args.output_dir)
+    paths = fullDF['abspath']
+
     # Load model files and config file
     network = Network()
     network.load_model(args.model_dir)
-    images = align_dataset.pre_processing(args)
+    images = preprocess(paths, network.config, False)
 
     # Run forward pass to calculate embeddings
     mu, sigma_sq = network.extract_feature(images, args.batch_size, verbose=True)
@@ -70,6 +75,8 @@ if __name__ == '__main__':
     parser.add_argument("--model_dir", help="The path to the pre-trained model directory",
                         type=str)
     parser.add_argument("--dataset_path", help="The path to the LFW dataset directory",
+                        type=str, default='data/lfw_mtcnncaffe_aligned')
+    parser.add_argument("--output_dir", help="The path to the aligned images",
                         type=str, default='data/lfw_mtcnncaffe_aligned')
     parser.add_argument('--shape', help='final shape (square)',
                         type=int, default=128)
