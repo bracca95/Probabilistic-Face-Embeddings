@@ -179,8 +179,11 @@ class Dataset(object):
 
 
     def getDF(self):
-        return self.data
-
+        if type(self.data)==pd.DataFrame or not self.data.empty:
+            return self.data
+        else:
+            print('df empy or not dataframe type')
+            sys.exit()
 
 
     def init_from_folder(self, folder):

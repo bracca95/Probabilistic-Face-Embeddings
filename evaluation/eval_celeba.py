@@ -29,6 +29,7 @@ import argparse
 import time
 import math
 import numpy as np
+import pandas as pd
 
 sys.path.append('/content/Probabilistic-Face-Embeddings')
 from align import align_dataset
@@ -42,14 +43,15 @@ from evaluation.celeba import CelebATest
 
 def main(args):
 
-    dataset = Dataset(args.dataset_path)      
-    fullDF = dataset.getDF()                  # pd.DataFrame object
-    paths = fullDF['abspath']                 # pd Series
-    print('%d images to load.' % len(paths))
-    assert(len(paths)>0)
-
-    # save images and return updated DF
-    fullDF = align_dataset.processing(fullDF, args.output_dir)
+    df_path = args.csv
+    if os.path.exists(df_path):
+        fullDF = pd.read_csv(df_path)
+    else:
+        dataset = Dataset(args.dataset_path)      
+        fullDF = dataset.getDF()                  # pd.DataFrame object
+        paths = fullDF['abspath']                 # pd Series
+        fullDF = align_dataset.processing(fullDF, args.output_dir, df_path)
+    
     paths = fullDF['abspath']
 
     # Load model files and config file
@@ -74,10 +76,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_dir", help="The path to the pre-trained model directory",
                         type=str)
-    parser.add_argument("--dataset_path", help="The path to the LFW dataset directory",
-                        type=str, default='data/lfw_mtcnncaffe_aligned')
+    parser.add_argument("--dataset_path", help="The path to the CelebA dataset directory",
+                        type=str, default='dataset/img_align_celeba')
     parser.add_argument("--output_dir", help="The path to the aligned images",
-                        type=str, default='data/lfw_mtcnncaffe_aligned')
+                        type=str, default='data/celeba_align')
+    parser.add_argument("--csv", help="The path to the csv file",
+                        type=str, default='data/df.csv')
     parser.add_argument('--shape', help='final shape (square)',
                         type=int, default=128)
     parser.add_argument("--protocol_path", help="The path to the LFW protocol file",

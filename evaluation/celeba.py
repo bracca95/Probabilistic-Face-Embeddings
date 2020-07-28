@@ -93,13 +93,6 @@ class CelebATest:
                 f1, _ = os.path.splitext(face1)          # get string face 1
                 f2, _ = os.path.splitext(face2)          # get string face 2
 
-                # f1 = int(f1)
-                # f2 = int(f2)
-                
-                # # fill examples
-                # indices1[iden] = f1
-                # indices2[iden] = f2
-
                 indices1[iden] = index_dict[f1]
                 indices2[iden] = index_dict[f2]
 
@@ -125,8 +118,6 @@ class CelebATest:
                 [self.standard_folds[j].indices2 for j in range(self.n_fold) if j!=i])
             train_labels = np.concatenate(\
                 [self.standard_folds[j].labels for j in range(self.n_fold) if j!=i])
-
-            print(len(train_indices1), train_indices1)
 
             train_features1 = features[train_indices1,:]
             train_features2 = features[train_indices2,:]
