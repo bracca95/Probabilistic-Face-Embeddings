@@ -60,15 +60,15 @@ def main(args):
     images = preprocess(paths, network.config, False)
 
     # Run forward pass to calculate embeddings
-    mu, sigma_sq = network.extract_feature(images, args.batch_size, verbose=True)
+    mu, sigma_sq = network.extract_feature(images, args.batch_size, verbose=False)
     feat_pfe = np.concatenate([mu, sigma_sq], axis=1)
     
     celebatest = CelebATest(paths)
     celebatest.init_standard_proto(fullDF)
 
-    accuracy, threshold = celebatest.test_standard_proto(mu, utils.pair_euc_score)
-    print('Euclidean (cosine) accuracy: %.5f threshold: %.5f' % (accuracy, threshold))
-    accuracy, threshold = celebatest.test_standard_proto(feat_pfe, utils.pair_MLS_score)
+    #accuracy, threshold = celebatest.test_standard_proto(mu, utils.pair_euc_score)
+    #print('Euclidean (cosine) accuracy: %.5f threshold: %.5f' % (accuracy, threshold))
+    accuracy, threshold = celebatest.test_standard_proto(feat_pfe, utils.pair_MLS_score, args.pos_idx)
     print('MLS accuracy: %.5f threshold: %.5f' % (accuracy, threshold))
 
 
@@ -88,5 +88,7 @@ if __name__ == '__main__':
                         type=str, default='./proto/lfw_pairs.txt')
     parser.add_argument("--batch_size", help="Number of images per mini batch",
                         type=int, default=128)
+    parser.add_argument("--pos_idx", help="<300:True, >300:False",
+                        type=int, default=2)
     args = parser.parse_args()
     main(args)

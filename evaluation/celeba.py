@@ -23,9 +23,10 @@
 # SOFTWARE.
 
 import os
+import cv2
 import pandas as pd
 import numpy as np
-import scipy.io as sio
+import matplotlib.pyplot as plt
 from evaluation import metrics
 from collections import namedtuple
 
@@ -46,10 +47,16 @@ class CelebATest:
 
         self.standard_folds = []
 
-        index_dict = {}
+        self.index_dict = pd.DataFrame([], columns=['key', 'val'])
         for i, image_path in enumerate(self.image_paths):
             image_name, image_ext = os.path.splitext(os.path.basename(image_path))
-            index_dict[image_name] = i
+            line = pd.DataFrame([[image_name, i]], columns=['key', 'val'])
+            self.index_dict = self.index_dict.append(line)
+
+        # self.index_dict = {}
+        # for i, image_path in enumerate(self.image_paths):
+        #     image_name, image_ext = os.path.splitext(os.path.basename(image_path))
+        #     self.index_dict[image_name] = i
 
         # retrieve all the IDs (unique)
         df = lfw_pairs_file
@@ -93,14 +100,17 @@ class CelebATest:
                 f1, _ = os.path.splitext(face1)          # get string face 1
                 f2, _ = os.path.splitext(face2)          # get string face 2
 
-                indices1[iden] = index_dict[f1]
-                indices2[iden] = index_dict[f2]
+                filt_f1 = (self.index_dict['key'] == f1)
+                filt_f2 = (self.index_dict['key'] == f2)
+
+                indices1[iden] = self.index_dict.loc[filt_f1]['val'].values[0]
+                indices2[iden] = self.index_dict.loc[filt_f2]['val'].values[0]
 
             fold = StandardFold(indices1, indices2, labels)
             self.standard_folds.append(fold)
 
 
-    def test_standard_proto(self, features, compare_func):
+    def test_standard_proto(self, features, compare_func, pos_idx):
 
         assert self.standard_folds is not None
         
@@ -111,6 +121,14 @@ class CelebATest:
         features2 = []
 
         for i in range(self.n_fold):
+            """
+            The network needs training: select all the j (600) images for each
+            folder apart from the one that, for each iteration, have the same
+            value of i (e.g. at iteration 23 -> i=23, skip identity j=23).
+            All of those that are skipped will be used for testing (one folder
+            - the remaining 600/6.000 values - for every iteration).
+            """
+
             # Training
             train_indices1 = np.concatenate(\
                 [self.standard_folds[j].indices1 for j in range(self.n_fold) if j!=i])
@@ -119,6 +137,7 @@ class CelebATest:
             train_labels = np.concatenate(\
                 [self.standard_folds[j].labels for j in range(self.n_fold) if j!=i])
 
+            # position[train_indices1, all_the_512_features]
             train_features1 = features[train_indices1,:]
             train_features2 = features[train_indices2,:]
             
@@ -129,9 +148,66 @@ class CelebATest:
             fold = self.standard_folds[i]
             test_features1 = features[fold.indices1,:]
             test_features2 = features[fold.indices2,:]
+            test_labels = fold.labels
             
             test_score = compare_func(test_features1, test_features2)
-            accuracies[i], _ = metrics.accuracy(test_score, fold.labels, np.array([thresholds[i]]))
+            accuracies[i], _ = metrics.accuracy(test_score, test_labels, np.array([thresholds[i]]))
+
+            """se i == 0 prendi uno degli index a caso tra i 600 e risali al
+            nome delle immagini tramite self.index_dict, così dopo le puoi plottare
+            """
+            if i == 0:
+                pos_idx
+                lab = True if pos_idx < 300 else False
+
+                img1 = fold.indices1[pos_idx]
+                img2 = fold.indices2[pos_idx]
+
+                feat1 = features[img1, :]
+                feat2 = features[img2, :]
+
+                # shape depends on compare function 1st (1, 512) / 2nd (1, 1024)
+                feat1 = feat1.reshape(1, -1)
+                feat2 = feat2.reshape(1, -1)
+
+                score = compare_func(feat1, feat2)
+                #accur, _ = metrics.accuracy(score, lab, np.array([thresholds[i]]))
+
+                accur = np.zeros(1)
+                pred_vec = score>=thresholds[i]
+                accur = np.mean(pred_vec==lab)
+
+                # retrieve image name
+                filt_img1 = (self.index_dict['val'] == img1)
+                filt_img2 = (self.index_dict['val'] == img2)
+                image_name1 = self.index_dict.loc[filt_img1]['key'].values[0]
+                image_name2 = self.index_dict.loc[filt_img2]['key'].values[0]
+
+                print(f'image1:{image_name1},\
+                        image2:{image_name2},\
+                        label:{lab},\
+                        score:{score},\
+                        accuracy:{accur}\n')
+
+                img_fold = '/content/Probabilistic-Face-Embeddings/data/celeba_align'
+
+                plt.figure()
+                f, axarr = plt.subplots(1,2)
+                f.suptitle(f'same={str(lab)}, accuracy={str(accur)}')
+                
+                i1 = cv2.imread(os.path.join(img_fold, f'{image_name1}.jpg'), cv2.IMREAD_COLOR)
+                i2 = cv2.imread(os.path.join(img_fold, f'{image_name2}.jpg'), cv2.IMREAD_COLOR)
+                
+                i1 = cv2.cvtColor(i1, cv2.COLOR_BGR2RGB)
+                i2 = cv2.cvtColor(i2, cv2.COLOR_BGR2RGB)
+                axarr[0].imshow(i1)
+                axarr[1].imshow(i2)
+
+                save_fold = '/content/out_figures'
+                if not os.path.exists(save_fold):
+                    os.makedirs(save_fold)
+                plt.savefig(os.path.join(save_fold, f'image_{pos_idx}.jpg'))
+
 
         accuracy = np.mean(accuracies)
         threshold = - np.mean(thresholds)

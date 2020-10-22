@@ -219,9 +219,13 @@ def accuracy(score_vec, label_vec, thresholds=None):
         warn('number of thresholds (%d) very large, computation may take a long time!' % np.size(thresholds))
     
     # Loop Computation
+    # the passed thresholds is thresholds[i] so only one value
     accuracies = np.zeros(np.size(thresholds))
     for i, threshold in enumerate(thresholds):
+        # true if utils.py's score >= threshold
+        # returns a vector of len = len(score_vec) of booleans
         pred_vec = score_vec>=threshold
+        # 1.0 if True/True, 0.0 if False/False
         accuracies[i] = np.mean(pred_vec==label_vec)
 
     # Matrix Computation, Each column is a threshold
